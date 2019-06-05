@@ -1,0 +1,103 @@
+
+<style>
+
+  .center-card {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+</style>
+
+<div id='app' class="columns is-multiline is-centered">
+
+  <!--Room-->
+  <div class="column is-5-desktop is-12-mobile center-card">
+
+    <div class="card" style="min-width: 100%;">
+      <div class="card-content">
+
+        <h2 class="tag is-success is-size-4 has-text-weight-bold">Registrate</h2>
+        
+        <hr>
+        
+        <div class="content">
+          <form @submit.prevent="send">
+
+              <div class="field">
+                <label class="label">nickname</label>
+                <div class="control">
+  
+                  <input v-model="nick" class="input" type="text" placeholder="...">
+    
+                </div>
+              </div>
+    
+
+            <div class="field">
+              <label class="label">Correo electrónico</label>
+              <div class="control">
+
+                <input v-model="email" class="input" type="email" placeholder="example@gmail.com">
+  
+              </div>
+            </div>
+  
+            <div class="field">
+              <label class="label">Contraseña</label>
+              <div class="control">
+                <input v-model="password" class="input" type="password" placeholder="Su contraseña">
+              </div>
+            </div>
+
+            <br>
+
+            <div class="field is-grouped">
+              <div class="control">
+                <button class="button is-link ">Enviar</button>
+              </div>
+            </div>
+
+          </form>
+
+          <br>
+
+          <span>tienes cuenta?</span>
+          <a href="/">Inicia sesión</a>
+
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+const vue = new Vue({
+  el: '#app',
+  data () {
+    return {
+      email: '',
+      nick: '',
+      password: ''
+    }
+  },
+  methods: {
+    send () {
+      axios.post('/auth/signup', {
+        nick: this.nick,
+        email: this.email,
+        password: this.password
+      })
+      .then((res) => {
+        window.location = '/'
+      })
+    }
+  }
+})
+
+</script>

@@ -1,0 +1,317 @@
+
+<style>
+  .frame-chat {
+    min-height: 50vh;
+  }
+  
+  .frame-box {
+    height: 30em;
+    overflow-y: scroll;
+  }
+</style>
+
+<div id='app' class="columns is-multiline is-centered">
+
+  <!--Room-->
+  <div class="column is-3-desktop is-12-mobile">
+    <button v-if="logout" class="nav-item button" @click="closeSession">Cerrar sesión</button>
+
+    <div class="card frame-chat">
+      <div class="card-content">
+
+        <h2 class="tag is-success is-size-4 has-text-weight-bold">Salas</h2>
+        
+        <hr>
+
+        <button class="button is-info is-medium" @click="isModalActive = true">Crear sala</button>
+
+        <hr>
+
+        <div class="media" v-for='(chat, index) of chats' :key="`chat_${index}`">
+
+          <div class="media-left">
+            <figure class="image is-48x48">
+              <img class="is-rounded" :src="chat.image" alt="image">
+            </figure>
+          </div>
+
+          <div class="media-content">
+            <p class="title is-4" style="cursor: pointer;" @click="selectChat(chat.id)"> {{ chat.name }} </p>
+            <p class="subtitle is-6">{{ chat.created_at }}</p>
+            <button class="button is-small is-danger" @click="deleteRoom(chat.id)">Delete</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!--Chats-->
+  <div class="column is-9-desktop is-12-mobile">
+
+      <div class="card frame-chat">
+        <div class="card-content">
+  
+          <h2 class="tag is-success is-size-4 has-text-weight-bold">Salas</h2>
+          
+          <hr>
+  
+          <!--Caja de comentarios-->
+          <div id='chat-area' class="frame-box" v-if="currentChatId !== undefined">
+
+            <!-- Comentarios -->
+            <div v-for='(message, index) of messages' :key='`message-${index}`'>
+
+              <span class="tag is-medium" :class="{ 'is-pulled-right' : (message.user_id == user_id), 'is-pulled-left' : (message.user_id != user_id), 'is-info' : (message.user_id == user_id), 'is-success':(message.user_id != user_id)}">
+                {{ message.text }}
+              </span>
+              <br>
+              <br>
+
+
+            </div>
+          </div>
+          <div v-else>
+            <p class="is-size-3">Seleccione un chat</p>
+          </div>
+
+          <div class="field has-addons">
+            <div class="control is-expanded">
+
+              <input v-model='text' class="input" type="text" placeholder="Escribe aquí" @keydown.enter='sendMessage'>
+
+            </div>
+            <div class="control">
+              <button class="button is-info" @click='sendMessage'>
+                Enviar
+              </button>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+
+
+    <!--Modal de creación de sala-->
+    <div class="modal" :class="{ 'is-active' : isModalActive }">
+      <div class="modal-background" @click="isModalActive = false"></div>
+      <div class="modal-content">
+        
+        <div class="card">
+          <div class="card-content">
+            <form @submit.prevent="createRoom">
+
+              <div class="field">
+                <label class="label">Nombre</label>
+                <div class="control">
+                  <input v-model='name' class="input" type="text" placeholder="Nombre interesante">
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="label">Descripción</label>
+                <div class="control">
+                  <input v-model='description' class="input" type="text" placeholder="Descripción interesante">
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="label">Temática</label>
+                <div class="control">
+                  <div class="select">
+                    <select v-model='topic'>
+                      <option value=''>Selecciona una temática</option>
+                      <option value='random'>random</option>
+                      <option value='magic'>magic</option>
+                      <option value='code'>code</option>
+                      <option value='games'>games</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+
+              <div class="field">
+                  
+                <div class="control">
+                  <button class="button is-info">Crear sala</button>
+                  
+                </div>
+              </div>
+
+            </form>
+          </div>
+        </div>
+
+      </div>
+      <button class="modal-close is-large" aria-label="close" @click="isModalActive = false"></button>
+    </div>
+
+</div>
+
+<script src="/dependencies/sails.io.js"></script>
+<script>
+
+const config = {
+  headers: { Authorization: "Bearer " + localStorage.getItem('token') }
+}
+
+const vue = new Vue({
+  el: '#app',
+  data: function () {
+    return {
+      // Tools - modales
+      isModalActive: false,
+      // Actions
+      logout: false,
+      currentChatId: undefined,
+      // CRUD Room
+      name: '',
+      description: '',
+      image: '',
+      topic: '', // ['random', 'magic', 'games', 'code']
+      room_id: '',
+      // Chat
+      user_id: 0,
+      text: '',
+      chats: [],
+      messages: []
+    }
+  },
+  created () {
+    this.authValidation()
+    console.log(config)
+    this.user_id = new Date().getTime() + ''
+    this.fetch()
+    this.configSocket()
+    // let interval = setInterval(this.poolingChat, 1000)
+  },
+  methods: {
+    authValidation () {
+      let token = localStorage.getItem('token')
+      if (!token) {
+        window.location = '/'
+      } else {
+        axios.get('/auth/check', config)
+        .then((res) => {
+          console.log(res.status == 200, 'asdf')
+          if (res.status != 200) {
+           window.location = '/'
+          }
+          this.logout = true
+        })
+      }
+    },
+    closeSession () {
+      localStorage.removeItem('token')
+      window.location = '/'
+    },
+    configSocket () {
+      let _ = this
+      io.socket.on('message', (data) => {
+        console.log(data, 'socket')
+        if (data.room == this.currentChatId) {
+          _.getChat()
+        }
+      });
+    },
+    getChat () {
+      console.log('ping')
+      if (this.currentChatId !== undefined) {
+        axios.get(`/rooms/${this.currentChatId}/messages`, config)
+          .then(result => {
+            this.messages = result.data
+            setTimeout(() => {
+              document.getElementById('chat-area').scrollTop = document.getElementById('chat-area').scrollHeight
+            }, 300)
+          })
+          .catch(err => {
+            console.log(err)
+          })
+      }
+    },
+    selectChat (chat_id)  {
+      this.currentChatId = chat_id
+      this.getChat()
+    },
+    fetch () {
+      axios.get('/rooms', config)
+        .then((response) => {
+          // handle success
+          this.chats = response.data.map(chat => ({
+            id: chat.id,
+            name: chat.name,
+            image: chat.information.length > 0 ? chat.information.pop().image : 'none.jpg',
+            created_at: chat.createdAt
+          }))
+        })
+        .catch(function (error) {
+          console.log(error);
+        })
+    },
+    sendMessage () {
+      if (this.currentChatId === undefined) {
+        alert('Seleccione un chat')
+        return
+      }
+
+      let dataRoom = {
+        text: this.text,
+        user_id: this.user_id
+      }
+      
+      axios.post(`/rooms/${this.currentChatId}/messages`, dataRoom, config)
+        .then((res) => {
+          console.log('Elemento creado')
+          this.text = ''
+        })
+        .catch((err) => {
+          console.log(err)
+        })
+    },
+    deleteRoom (id) {
+      let confirmation = confirm('Deseas eliminar la sala')
+      if (confirmation) {
+        axios.delete(`/rooms/${id}`, config)
+        .then(() => {
+          this.fetch()
+          alert('El dato se ha eliminado')
+        })
+      }
+    },
+    createRoom () {
+      // Crear sala
+      let dataRoom = {
+        name: this.name
+      }
+      axios.post('/rooms', dataRoom, config)
+        .then((res) => {
+          
+          let room_id = res.data.id
+          // Crear información
+          // Crear sala
+          let dataInfo = {
+            description: this.description,
+            image: this.image,
+            topic: this.topic
+          }
+
+          axios.post(`/rooms/${room_id}/informations`, dataInfo, config)
+            .then(() => {
+              this.isModalActive = false
+              this.fetch()
+            })
+            .catch((err) => {
+              console.log(err)
+            })          
+        })
+        .catch((err) => {
+          console.log(err)
+        })
+    }
+  }
+})
+
+</script>
