@@ -1,7 +1,5 @@
-# base-video
-
+# [CF] Intro Sails.js
 a [Sails v1](https://sailsjs.com) application
-
 
 ### Links
 
